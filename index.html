@@ -23,164 +23,229 @@
 
     <ul id="itemList"></ul>
 
-<script>
-    // Service Worker Registration
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('Service Worker registered!', reg))
-                .catch(err => console.log('Service Worker registration failed:', err));
+<script type="module">
+    import init, { Crud, save_to_file, load_from_file } from './out/crud_wasm.js';
+    import { createWorker } from 'https://unpkg.com/tesseract.js@4.0.1/dist/tesseract.min.js';
+
+    // Função para abrir IndexedDB
+    async function openDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('PWADatabase', 1);
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                db.createObjectStore('handles', { keyPath: 'id' });
+            };
+            request.onsuccess = (event) => resolve(event.target.result);
+            request.onerror = (event) => reject(event.target.error);
         });
     }
 
-    // PWA Install Prompt
-    let deferredPrompt;
-    const installButton = document.getElementById('installButton');
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        installButton.style.display = 'block';
-    });
-
-    installButton.addEventListener('click', async () => {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log(`User response to the install prompt: ${outcome}`);
-            deferredPrompt = null;
-        }
-        installButton.style.display = 'none';
-    });
-
-    // File System Access API
-    let directoryHandle = null;
-
-    async function requestDirectoryAccess() {
-        try {
-            directoryHandle = await window.showDirectoryPicker();
-            console.log('Acesso à pasta concedido:', directoryHandle);
-            // Verifica e solicita permissão persistente
-            const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
-            if (permission === 'granted') {
-                console.log('Permissão de leitura/escrita concedida.');
-                // Salva o handle no localStorage (serializado como string para referência)
-                localStorage.setItem('directoryHandle', JSON.stringify(directoryHandle.name));
-            }
-        } catch (err) {
-            console.error('Erro ao acessar pasta:', err);
-        }
+    // Salvar FileSystemDirectoryHandle no IndexedDB
+    async function saveHandle(handle) {
+        const db = await openDB();
+        const tx = db.transaction('handles', 'readwrite');
+        const store = tx.objectStore('handles');
+        store.put({ id: 'directory', handle });
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
     }
 
-    async function saveItemsToFile() {
-        if (!directoryHandle) {
-            await requestDirectoryAccess();
+    // Recuperar FileSystemDirectoryHandle do IndexedDB
+    async function getHandle() {
+        const db = await openDB();
+        const tx = db.transaction('handles', 'readonly');
+        const store = tx.objectStore('handles');
+        const request = store.get('directory');
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => resolve(request.result?.handle);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function initApp() {
+        await init();
+        const crud = new Crud();
+        await crud.load_from_storage();
+
+        // Verificar permissão salva
+        window.directoryHandle = await getHandle();
+        if (window.directoryHandle) {
+            const permission = await window.directoryHandle.requestPermission({ mode: 'readwrite' });
+            if (permission !== 'granted') {
+                window.directoryHandle = null;
+            }
         }
-        if (directoryHandle) {
+
+        // Service Worker e Install Prompt (mantido do código anterior)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registered!', reg))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+
+        let deferredPrompt;
+        const installButton = document.getElementById('installButton');
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installButton.style.display = 'block';
+        });
+
+        installButton.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`User response to the install prompt: ${outcome}`);
+                deferredPrompt = null;
+            }
+            installButton.style.display = 'none';
+        });
+
+        // File System Access API
+        async function requestDirectoryAccess() {
             try {
-                const fileHandle = await directoryHandle.getFileHandle('items.json', { create: true });
-                const writable = await fileHandle.createWritable();
-                const items = JSON.parse(localStorage.getItem('items')) || [];
-                await writable.write(JSON.stringify(items, null, 2));
-                await writable.close();
-                console.log('Lista salva em items.json');
+                window.directoryHandle = await window.showDirectoryPicker();
+                console.log('Acesso à pasta concedido:', window.directoryHandle);
+                const permission = await window.directoryHandle.requestPermission({ mode: 'readwrite' });
+                if (permission === 'granted') {
+                    console.log('Permissão de leitura/escrita concedida.');
+                    await saveHandle(window.directoryHandle); // Salvar no IndexedDB
+                    localStorage.setItem('directoryHandle', JSON.stringify(window.directoryHandle.name));
+                } else {
+                    window.directoryHandle = null;
+                }
             } catch (err) {
-                console.error('Erro ao salvar arquivo:', err);
+                console.error('Erro ao acessar pasta:', err);
             }
         }
-    }
 
-    async function loadItemsFromFile() {
-        if (!directoryHandle) {
-            await requestDirectoryAccess();
+        async function saveItemsToFile() {
+            if (!window.directoryHandle) {
+                await requestDirectoryAccess();
+            }
+            if (window.directoryHandle) {
+                try {
+                    const items = crud.get_items();
+                    await save_to_file(JSON.stringify(items), 'items.json');
+                    console.log('Lista salva em items.json');
+                } catch (err) {
+                    console.error('Erro ao salvar arquivo:', err);
+                }
+            }
         }
-        if (directoryHandle) {
-            try {
-                const fileHandle = await directoryHandle.getFileHandle('items.json');
-                const file = await fileHandle.getFile();
-                const text = await file.text();
-                const items = JSON.parse(text);
-                localStorage.setItem('items', JSON.stringify(items));
+
+        async function loadItemsFromFile() {
+            if (!window.directoryHandle) {
+                await requestDirectoryAccess();
+            }
+            if (window.directoryHandle) {
+                try {
+                    const data = await load_from_file('items.json');
+                    const items = JSON.parse(data);
+                    localStorage.setItem('items', JSON.stringify(items));
+                    await crud.load_from_storage();
+                    loadItems();
+                    console.log('Lista carregada de items.json');
+                } catch (err) {
+                    console.error('Erro ao carregar arquivo:', err);
+                }
+            }
+        }
+
+        // OCR com Tesseract.js (mantido do código anterior)
+        const imageInput = document.getElementById('imageInput');
+        const ocrButton = document.getElementById('ocrButton');
+
+        async function processImage() {
+            const file = imageInput.files[0];
+            if (!file) return;
+            const worker = await createWorker('eng');
+            const { data: { text } } = await worker.recognize(file);
+            await worker.terminate();
+            if (text.trim()) {
+                await crud.add_item(text.trim());
+                await saveItemsToFile();
                 loadItems();
-                console.log('Lista carregada de items.json');
-            } catch (err) {
-                console.error('Erro ao carregar arquivo:', err);
+            }
+            imageInput.value = '';
+        }
+
+        ocrButton.addEventListener('click', processImage);
+
+        // CRUD (mantido do código anterior)
+        const itemInput = document.getElementById('itemInput');
+        const addButton = document.getElementById('addButton');
+        const itemList = document.getElementById('itemList');
+
+        function loadItems() {
+            const items = crud.get_items();
+            itemList.innerHTML = '';
+            items.forEach((item, index) => {
+                const li = document.createElement('li');
+                const span = document.createElement('span');
+                span.textContent = item;
+                li.appendChild(span);
+
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Editar';
+                editButton.onclick = () => editItem(index);
+                li.appendChild(editButton);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Deletar';
+                deleteButton.onclick = () => deleteItem(index);
+                li.appendChild(deleteButton);
+
+                itemList.appendChild(li);
+            });
+        }
+
+        async function addItem() {
+            const newItem = itemInput.value.trim();
+            if (newItem) {
+                await crud.add_item(newItem);
+                await saveItemsToFile();
+                loadItems();
+                itemInput.value = '';
             }
         }
-    }
 
-    // CRUD Functionality with localStorage
-    const itemInput = document.getElementById('itemInput');
-    const addButton = document.getElementById('addButton');
-    const itemList = document.getElementById('itemList');
+        async function editItem(index) {
+            const newValue = prompt('Edite o item:', crud.get_items()[index]);
+            if (newValue !== null) {
+                await crud.edit_item(index, newValue.trim());
+                await saveItemsToFile();
+                loadItems();
+            }
+        }
 
-    function loadItems() {
-        const items = JSON.parse(localStorage.getItem('items')) || [];
-        itemList.innerHTML = '';
-        items.forEach((item, index) => {
-            const li = document.createElement('li');
-            const span = document.createElement('span');
-            span.textContent = item;
-            li.appendChild(span);
+        async function deleteItem(index) {
+            await crud.delete_item(index);
+            await saveItemsToFile();
+            loadItems();
+        }
 
-            const editButton = document.createElement('button');
-            editButton.textContent = 'Editar';
-            editButton.onclick = () => editItem(index);
-            li.appendChild(editButton);
+        const saveButton = document.createElement('button');
+        saveButton.textContent = 'Salvar em Arquivo';
+        saveButton.onclick = saveItemsToFile;
+        document.body.appendChild(saveButton);
 
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Deletar';
-            deleteButton.onclick = () => deleteItem(index);
-            li.appendChild(deleteButton);
+        const loadButton = document.createElement('button');
+        loadButton.textContent = 'Carregar de Arquivo';
+        loadButton.onclick = loadItemsFromFile;
+        document.body.appendChild(loadButton);
 
-            itemList.appendChild(li);
-        });
-    }
-
-    function saveItems(items) {
-        localStorage.setItem('items', JSON.stringify(items));
-        saveItemsToFile(); // Salva automaticamente no arquivo ao modificar
+        addButton.addEventListener('click', addItem);
         loadItems();
     }
 
-    function addItem() {
-        const items = JSON.parse(localStorage.getItem('items')) || [];
-        const newItem = itemInput.value.trim();
-        if (newItem) {
-            items.push(newItem);
-            saveItems(items);
-            itemInput.value = '';
-        }
-    }
-
-    function editItem(index) {
-        const items = JSON.parse(localStorage.getItem('items')) || [];
-        const newValue = prompt('Edite o item:', items[index]);
-        if (newValue !== null) {
-            items[index] = newValue.trim();
-            saveItems(items);
-        }
-    }
-
-    function deleteItem(index) {
-        const items = JSON.parse(localStorage.getItem('items')) || [];
-        items.splice(index, 1);
-        saveItems(items);
-    }
-
-    // Adiciona botões para gerenciar arquivos
-    const saveButton = document.createElement('button');
-    saveButton.textContent = 'Salvar em Arquivo';
-    saveButton.onclick = saveItemsToFile;
-    document.body.appendChild(saveButton);
-
-    const loadButton = document.createElement('button');
-    loadButton.textContent = 'Carregar de Arquivo';
-    loadButton.onclick = loadItemsFromFile;
-    document.body.appendChild(loadButton);
-
-    addButton.addEventListener('click', addItem);
-    loadItems();
+    initApp();
 </script>
 </body>
 </html>
+
 
