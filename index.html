@@ -23,96 +23,163 @@
 
     <ul id="itemList"></ul>
 
-    <script>
-        // Service Worker Registration
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('Service Worker registered!', reg))
-                    .catch(err => console.log('Service Worker registration failed:', err));
-            });
-        }
-
-        // PWA Install Prompt
-        let deferredPrompt;
-        const installButton = document.getElementById('installButton');
-
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            installButton.style.display = 'block';
+<script>
+    // Service Worker Registration
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('Service Worker registered!', reg))
+                .catch(err => console.log('Service Worker registration failed:', err));
         });
+    }
 
-        installButton.addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                console.log(`User response to the install prompt: ${outcome}`);
-                deferredPrompt = null;
+    // PWA Install Prompt
+    let deferredPrompt;
+    const installButton = document.getElementById('installButton');
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installButton.style.display = 'block';
+    });
+
+    installButton.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User response to the install prompt: ${outcome}`);
+            deferredPrompt = null;
+        }
+        installButton.style.display = 'none';
+    });
+
+    // File System Access API
+    let directoryHandle = null;
+
+    async function requestDirectoryAccess() {
+        try {
+            directoryHandle = await window.showDirectoryPicker();
+            console.log('Acesso à pasta concedido:', directoryHandle);
+            // Verifica e solicita permissão persistente
+            const permission = await directoryHandle.requestPermission({ mode: 'readwrite' });
+            if (permission === 'granted') {
+                console.log('Permissão de leitura/escrita concedida.');
+                // Salva o handle no localStorage (serializado como string para referência)
+                localStorage.setItem('directoryHandle', JSON.stringify(directoryHandle.name));
             }
-            installButton.style.display = 'none';
+        } catch (err) {
+            console.error('Erro ao acessar pasta:', err);
+        }
+    }
+
+    async function saveItemsToFile() {
+        if (!directoryHandle) {
+            await requestDirectoryAccess();
+        }
+        if (directoryHandle) {
+            try {
+                const fileHandle = await directoryHandle.getFileHandle('items.json', { create: true });
+                const writable = await fileHandle.createWritable();
+                const items = JSON.parse(localStorage.getItem('items')) || [];
+                await writable.write(JSON.stringify(items, null, 2));
+                await writable.close();
+                console.log('Lista salva em items.json');
+            } catch (err) {
+                console.error('Erro ao salvar arquivo:', err);
+            }
+        }
+    }
+
+    async function loadItemsFromFile() {
+        if (!directoryHandle) {
+            await requestDirectoryAccess();
+        }
+        if (directoryHandle) {
+            try {
+                const fileHandle = await directoryHandle.getFileHandle('items.json');
+                const file = await fileHandle.getFile();
+                const text = await file.text();
+                const items = JSON.parse(text);
+                localStorage.setItem('items', JSON.stringify(items));
+                loadItems();
+                console.log('Lista carregada de items.json');
+            } catch (err) {
+                console.error('Erro ao carregar arquivo:', err);
+            }
+        }
+    }
+
+    // CRUD Functionality with localStorage
+    const itemInput = document.getElementById('itemInput');
+    const addButton = document.getElementById('addButton');
+    const itemList = document.getElementById('itemList');
+
+    function loadItems() {
+        const items = JSON.parse(localStorage.getItem('items')) || [];
+        itemList.innerHTML = '';
+        items.forEach((item, index) => {
+            const li = document.createElement('li');
+            const span = document.createElement('span');
+            span.textContent = item;
+            li.appendChild(span);
+
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Editar';
+            editButton.onclick = () => editItem(index);
+            li.appendChild(editButton);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Deletar';
+            deleteButton.onclick = () => deleteItem(index);
+            li.appendChild(deleteButton);
+
+            itemList.appendChild(li);
         });
+    }
 
-        // CRUD Functionality with localStorage
-        const itemInput = document.getElementById('itemInput');
-        const addButton = document.getElementById('addButton');
-        const itemList = document.getElementById('itemList');
+    function saveItems(items) {
+        localStorage.setItem('items', JSON.stringify(items));
+        saveItemsToFile(); // Salva automaticamente no arquivo ao modificar
+        loadItems();
+    }
 
-        function loadItems() {
-            const items = JSON.parse(localStorage.getItem('items')) || [];
-            itemList.innerHTML = '';
-            items.forEach((item, index) => {
-                const li = document.createElement('li');
-                const span = document.createElement('span');
-                span.textContent = item;
-                li.appendChild(span);
-
-                const editButton = document.createElement('button');
-                editButton.textContent = 'Editar';
-                editButton.onclick = () => editItem(index);
-                li.appendChild(editButton);
-
-                const deleteButton = document.createElement('button');
-                deleteButton.textContent = 'Deletar';
-                deleteButton.onclick = () => deleteItem(index);
-                li.appendChild(deleteButton);
-
-                itemList.appendChild(li);
-            });
+    function addItem() {
+        const items = JSON.parse(localStorage.getItem('items')) || [];
+        const newItem = itemInput.value.trim();
+        if (newItem) {
+            items.push(newItem);
+            saveItems(items);
+            itemInput.value = '';
         }
+    }
 
-        function saveItems(items) {
-            localStorage.setItem('items', JSON.stringify(items));
-            loadItems();
-        }
-
-        function addItem() {
-            const items = JSON.parse(localStorage.getItem('items')) || [];
-            const newItem = itemInput.value.trim();
-            if (newItem) {
-                items.push(newItem);
-                saveItems(items);
-                itemInput.value = '';
-            }
-        }
-
-        function editItem(index) {
-            const items = JSON.parse(localStorage.getItem('items')) || [];
-            const newValue = prompt('Edite o item:', items[index]);
-            if (newValue !== null) {
-                items[index] = newValue.trim();
-                saveItems(items);
-            }
-        }
-
-        function deleteItem(index) {
-            const items = JSON.parse(localStorage.getItem('items')) || [];
-            items.splice(index, 1);
+    function editItem(index) {
+        const items = JSON.parse(localStorage.getItem('items')) || [];
+        const newValue = prompt('Edite o item:', items[index]);
+        if (newValue !== null) {
+            items[index] = newValue.trim();
             saveItems(items);
         }
+    }
 
-        addButton.addEventListener('click', addItem);
-        loadItems();
-    </script>
+    function deleteItem(index) {
+        const items = JSON.parse(localStorage.getItem('items')) || [];
+        items.splice(index, 1);
+        saveItems(items);
+    }
+
+    // Adiciona botões para gerenciar arquivos
+    const saveButton = document.createElement('button');
+    saveButton.textContent = 'Salvar em Arquivo';
+    saveButton.onclick = saveItemsToFile;
+    document.body.appendChild(saveButton);
+
+    const loadButton = document.createElement('button');
+    loadButton.textContent = 'Carregar de Arquivo';
+    loadButton.onclick = loadItemsFromFile;
+    document.body.appendChild(loadButton);
+
+    addButton.addEventListener('click', addItem);
+    loadItems();
+</script>
 </body>
 </html>
