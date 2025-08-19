@@ -56,19 +56,21 @@
 
         // SQLite Setup
         let db = null;
+        let fileHandle = null;
+        let saveDB = null;
 
         async function initSQLite() {
             const SQL = await initSqlJs({
                 locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
             });
             const opfsRoot = await navigator.storage.getDirectory();
-            let fileHandle;
             try {
                 fileHandle = await opfsRoot.getFileHandle('crud.db', { create: true });
                 const file = await fileHandle.getFile();
                 const arrayBuffer = await file.arrayBuffer();
                 db = new SQL.Database(new Uint8Array(arrayBuffer));
             } catch (err) {
+                console.error('Erro ao carregar DB do OPFS:', err);
                 db = new SQL.Database();
             }
 
@@ -80,15 +82,19 @@
                 )
             `);
 
-            // Salva o banco no OPFS
-            async function saveDB() {
-                const data = db.export();
-                const writable = await fileHandle.createWritable();
-                await writable.write(data);
-                await writable.close();
-            }
-
-            return saveDB;
+            // Define a função saveDB
+            saveDB = async () => {
+                if (!fileHandle) return; // Se não houver OPFS, não salva (em memória apenas)
+                try {
+                    const data = db.export();
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(data);
+                    await writable.close();
+                    console.log('DB salvo no OPFS');
+                } catch (err) {
+                    console.error('Erro ao salvar DB:', err);
+                }
+            };
         }
 
         // CRUD Functionality with SQLite
@@ -131,7 +137,6 @@
             const name = itemInput.value.trim();
             if (name && db) {
                 db.run('INSERT INTO items (name) VALUES (?)', [name]);
-                const saveDB = await initSQLite();
                 await saveDB();
                 loadItems();
                 itemInput.value = '';
@@ -139,12 +144,12 @@
         }
 
         async function editItem(id) {
-            const items = db.exec('SELECT name FROM items WHERE id = ?', [id]);
-            const currentName = items[0].values[0][0];
+            const res = db.exec('SELECT name FROM items WHERE id = ' + id);
+            if (res.length === 0 || res[0].values.length === 0) return;
+            const currentName = res[0].values[0][0];
             const newName = prompt('Edite o item:', currentName);
             if (newName !== null && db) {
                 db.run('UPDATE items SET name = ? WHERE id = ?', [newName.trim(), id]);
-                const saveDB = await initSQLite();
                 await saveDB();
                 loadItems();
             }
@@ -153,7 +158,6 @@
         async function deleteItem(id) {
             if (db) {
                 db.run('DELETE FROM items WHERE id = ?', [id]);
-                const saveDB = await initSQLite();
                 await saveDB();
                 loadItems();
             }
