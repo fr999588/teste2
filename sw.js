@@ -1,9 +1,11 @@
-const CACHE_NAME = 'crud-pwa-cache-v1';
+const CACHE_NAME = 'crud-pwa-cache-v2';
 const urlsToCache = [
     '/',
     'index.html',
     'manifest.json',
-    'icon.png'
+    'icon.png',
+    'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.wasm',
+    'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.min.js'
 ];
 
 self.addEventListener('install', (event) => {
