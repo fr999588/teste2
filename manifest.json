@@ -1,5 +1,5 @@
 {
-    "name": "CRUD PWA Simples",
+    "name": "CRUD PWA com SQLite",
     "short_name": "CRUD PWA",
     "start_url": ".",
     "display": "standalone",
