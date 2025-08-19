@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRUD PWA Simples</title>
+    <title>CRUD PWA com SQLite</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" href="icon.png" type="image/png">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         input, button { margin: 5px; }
@@ -14,7 +15,7 @@
     </style>
 </head>
 <body>
-    <h1>CRUD PWA Simples çãí 22222222222</h1>
+    <h1>CRUD PWA com SQLite</h1>
     <p>Adicione, edite ou delete itens na lista.</p>
 
     <input type="text" id="itemInput" placeholder="Digite um item">
@@ -23,251 +24,148 @@
 
     <ul id="itemList"></ul>
 
-<script>
-    // Service Worker Registration
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('Service Worker registered!', reg))
-                .catch(err => console.log('Service Worker registration failed:', err));
-        });
-    }
-
-    // PWA Install Prompt
-    let deferredPrompt;
-    const installButton = document.getElementById('installButton');
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        installButton.style.display = 'block';
-    });
-
-    installButton.addEventListener('click', async () => {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log(`User response to the install prompt: ${outcome}`);
-            deferredPrompt = null;
+    <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registered!', reg))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
         }
-        installButton.style.display = 'none';
-    });
 
-    // IndexedDB Setup
-    const DB_NAME = 'crudPWA_DB';
-    const STORE_NAME = 'directoryHandles';
-    let db;
+        // PWA Install Prompt
+        let deferredPrompt;
+        const installButton = document.getElementById('installButton');
 
-    async function openDB() {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, 1);
-            request.onupgradeneeded = (event) => {
-                db = event.target.result;
-                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-            };
-            request.onsuccess = (event) => {
-                db = event.target.result;
-                resolve(db);
-            };
-            request.onerror = (event) => reject(event.target.error);
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installButton.style.display = 'block';
         });
-    }
 
-    async function storeDirectoryHandle(handle) {
-        const db = await openDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.put({ id: 'mainDirectory', handle });
-            request.onsuccess = resolve;
-            request.onerror = reject;
-        });
-    }
-
-    async function getDirectoryHandle() {
-        const db = await openDB();
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORE_NAME], 'readonly');
-            const store = transaction.objectStore(STORE_NAME);
-            const request = store.get('mainDirectory');
-            request.onsuccess = () => resolve(request.result ? request.result.handle : null);
-            request.onerror = reject;
-        });
-    }
-
-    // File System Access API
-    let directoryHandle = null;
-
-    async function requestDirectoryAccess() {
-        try {
-            directoryHandle = await window.showDirectoryPicker();
-            console.log('Acesso à pasta concedido:', directoryHandle);
-            // Armazena o handle no IndexedDB
-            await storeDirectoryHandle(directoryHandle);
-            // Solicita permissão readwrite
-            await verifyPermission(directoryHandle, true);
-        } catch (err) {
-            console.error('Erro ao acessar pasta:', err);
-        }
-    }
-
-    async function verifyPermission(handle, requestIfNeeded = false) {
-        const options = { mode: 'readwrite' };
-        const permissionStatus = await handle.queryPermission(options);
-        if (permissionStatus === 'granted') {
-            return true;
-        }
-        if (permissionStatus === 'prompt' && requestIfNeeded) {
-            const userPermission = await handle.requestPermission(options);
-            if (userPermission === 'granted') {
-                console.log('Permissão persistente concedida.');
-                return true;
+        installButton.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`User response to the install prompt: ${outcome}`);
+                deferredPrompt = null;
             }
-        }
-        return false;
-    }
+            installButton.style.display = 'none';
+        });
 
-    async function loadPersistedHandle() {
-        directoryHandle = await getDirectoryHandle();
-        if (directoryHandle) {
-            const hasPermission = await verifyPermission(directoryHandle, true);
-            if (hasPermission) {
-                console.log('Handle restaurado e permissão válida.');
-            } else {
-                directoryHandle = null; // Limpa se permissão negada
-                console.log('Permissão não concedida; solicite novamente.');
-            }
-        }
-    }
+        // SQLite Setup
+        let db = null;
 
-    // Chama ao carregar o app
-    window.addEventListener('load', async () => {
-        await loadPersistedHandle();
-    });
-
-    async function saveItemsToFile() {
-        if (!directoryHandle) {
-            await requestDirectoryAccess();
-        }
-        if (directoryHandle) {
-            // Verifica permissão antes de usar
-            const hasPermission = await verifyPermission(directoryHandle, true);
-            if (!hasPermission) {
-                console.error('Sem permissão para salvar.');
-                return;
-            }
+        async function initSQLite() {
+            const SQL = await initSqlJs({
+                locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
+            });
+            const opfsRoot = await navigator.storage.getDirectory();
+            let fileHandle;
             try {
-                const fileHandle = await directoryHandle.getFileHandle('items.json', { create: true });
-                const writable = await fileHandle.createWritable();
-                const items = JSON.parse(localStorage.getItem('items')) || [];
-                await writable.write(JSON.stringify(items, null, 2));
-                await writable.close();
-                console.log('Lista salva em items.json');
-            } catch (err) {
-                console.error('Erro ao salvar arquivo:', err);
-            }
-        }
-    }
-
-    async function loadItemsFromFile() {
-        if (!directoryHandle) {
-            await requestDirectoryAccess();
-        }
-        if (directoryHandle) {
-            const hasPermission = await verifyPermission(directoryHandle, true);
-            if (!hasPermission) {
-                console.error('Sem permissão para carregar.');
-                return;
-            }
-            try {
-                const fileHandle = await directoryHandle.getFileHandle('items.json');
+                fileHandle = await opfsRoot.getFileHandle('crud.db', { create: true });
                 const file = await fileHandle.getFile();
-                const text = await file.text();
-                const items = JSON.parse(text);
-                localStorage.setItem('items', JSON.stringify(items));
-                loadItems();
-                console.log('Lista carregada de items.json');
+                const arrayBuffer = await file.arrayBuffer();
+                db = new SQL.Database(new Uint8Array(arrayBuffer));
             } catch (err) {
-                console.error('Erro ao carregar arquivo:', err);
+                db = new SQL.Database();
+            }
+
+            // Cria tabela se não existir
+            db.run(`
+                CREATE TABLE IF NOT EXISTS items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL
+                )
+            `);
+
+            // Salva o banco no OPFS
+            async function saveDB() {
+                const data = db.export();
+                const writable = await fileHandle.createWritable();
+                await writable.write(data);
+                await writable.close();
+            }
+
+            return saveDB;
+        }
+
+        // CRUD Functionality with SQLite
+        const itemInput = document.getElementById('itemInput');
+        const addButton = document.getElementById('addButton');
+        const itemList = document.getElementById('itemList');
+
+        async function loadItems() {
+            if (!db) return;
+            const items = [];
+            const stmt = db.prepare('SELECT id, name FROM items');
+            while (stmt.step()) {
+                const row = stmt.getAsObject();
+                items.push({ id: row.id, name: row.name });
+            }
+            stmt.free();
+
+            itemList.innerHTML = '';
+            items.forEach(item => {
+                const li = document.createElement('li');
+                const span = document.createElement('span');
+                span.textContent = item.name;
+                li.appendChild(span);
+
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Editar';
+                editButton.onclick = () => editItem(item.id);
+                li.appendChild(editButton);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Deletar';
+                deleteButton.onclick = () => deleteItem(item.id);
+                li.appendChild(deleteButton);
+
+                itemList.appendChild(li);
+            });
+        }
+
+        async function addItem() {
+            const name = itemInput.value.trim();
+            if (name && db) {
+                db.run('INSERT INTO items (name) VALUES (?)', [name]);
+                const saveDB = await initSQLite();
+                await saveDB();
+                loadItems();
+                itemInput.value = '';
             }
         }
-    }
 
-    // CRUD Functionality
-    const itemInput = document.getElementById('itemInput');
-    const addButton = document.getElementById('addButton');
-    const itemList = document.getElementById('itemList');
+        async function editItem(id) {
+            const items = db.exec('SELECT name FROM items WHERE id = ?', [id]);
+            const currentName = items[0].values[0][0];
+            const newName = prompt('Edite o item:', currentName);
+            if (newName !== null && db) {
+                db.run('UPDATE items SET name = ? WHERE id = ?', [newName.trim(), id]);
+                const saveDB = await initSQLite();
+                await saveDB();
+                loadItems();
+            }
+        }
 
-    function loadItems() {
-        const items = JSON.parse(localStorage.getItem('items')) || [];
-        itemList.innerHTML = '';
-        items.forEach((item, index) => {
-            const li = document.createElement('li');
-            const span = document.createElement('span');
-            span.textContent = item;
-            li.appendChild(span);
+        async function deleteItem(id) {
+            if (db) {
+                db.run('DELETE FROM items WHERE id = ?', [id]);
+                const saveDB = await initSQLite();
+                await saveDB();
+                loadItems();
+            }
+        }
 
-            const editButton = document.createElement('button');
-            editButton.textContent = 'Editar';
-            editButton.onclick = () => editItem(index);
-            li.appendChild(editButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Deletar';
-            deleteButton.onclick = () => deleteItem(index);
-            li.appendChild(deleteButton);
-
-            itemList.appendChild(li);
+        // Inicializa o banco e carrega itens
+        window.addEventListener('load', async () => {
+            await initSQLite();
+            loadItems();
         });
-    }
 
-    function saveItems(items) {
-        localStorage.setItem('items', JSON.stringify(items));
-        saveItemsToFile(); // Salva automaticamente no arquivo ao modificar
-        loadItems();
-    }
-
-    function addItem() {
-        const items = JSON.parse(localStorage.getItem('items')) || [];
-        const newItem = itemInput.value.trim();
-        if (newItem) {
-            items.push(newItem);
-            saveItems(items);
-            itemInput.value = '';
-        }
-    }
-
-    function editItem(index) {
-        const items = JSON.parse(localStorage.getItem('items')) || [];
-        const newValue = prompt('Edite o item:', items[index]);
-        if (newValue !== null) {
-            items[index] = newValue.trim();
-            saveItems(items);
-        }
-    }
-
-    function deleteItem(index) {
-        const items = JSON.parse(localStorage.getItem('items')) || [];
-        items.splice(index, 1);
-        saveItems(items);
-    }
-
-    // Adiciona botões para gerenciar arquivos
-    const saveButton = document.createElement('button');
-    saveButton.textContent = 'Salvar em Arquivo';
-    saveButton.onclick = saveItemsToFile;
-    document.body.appendChild(saveButton);
-
-    const loadButton = document.createElement('button');
-    loadButton.textContent = 'Carregar de Arquivo';
-    loadButton.onclick = loadItemsFromFile;
-    document.body.appendChild(loadButton);
-
-    addButton.addEventListener('click', addItem);
-    loadItems();
-</script>
+        addButton.addEventListener('click', addItem);
+    </script>
 </body>
 </html>
-
-
-
-
