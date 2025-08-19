@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRUD PWA Simples</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon.png" type="image/png">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        input, button { margin: 5px; }
+        ul { list-style-type: none; padding: 0; }
+        li { margin: 10px 0; padding: 10px; border: 1px solid #ccc; display: flex; justify-content: space-between; align-items: center; }
+    </style>
+</head>
+<body>
+    <h1>CRUD PWA Simples</h1>
+    <p>Adicione, edite ou delete itens na lista.</p>
+
+    <input type="text" id="itemInput" placeholder="Digite um item">
+    <button id="addButton">Adicionar</button>
+    <button id="installButton" style="display: none;">Instalar App</button>
+
+    <ul id="itemList"></ul>
+
+    <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registered!', reg))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+
+        // PWA Install Prompt
+        let deferredPrompt;
+        const installButton = document.getElementById('installButton');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installButton.style.display = 'block';
+        });
+
+        installButton.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`User response to the install prompt: ${outcome}`);
+                deferredPrompt = null;
+            }
+            installButton.style.display = 'none';
+        });
+
+        // CRUD Functionality with localStorage
+        const itemInput = document.getElementById('itemInput');
+        const addButton = document.getElementById('addButton');
+        const itemList = document.getElementById('itemList');
+
+        function loadItems() {
+            const items = JSON.parse(localStorage.getItem('items')) || [];
+            itemList.innerHTML = '';
+            items.forEach((item, index) => {
+                const li = document.createElement('li');
+                const span = document.createElement('span');
+                span.textContent = item;
+                li.appendChild(span);
+
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Editar';
+                editButton.onclick = () => editItem(index);
+                li.appendChild(editButton);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Deletar';
+                deleteButton.onclick = () => deleteItem(index);
+                li.appendChild(deleteButton);
+
+                itemList.appendChild(li);
+            });
+        }
+
+        function saveItems(items) {
+            localStorage.setItem('items', JSON.stringify(items));
+            loadItems();
+        }
+
+        function addItem() {
+            const items = JSON.parse(localStorage.getItem('items')) || [];
+            const newItem = itemInput.value.trim();
+            if (newItem) {
+                items.push(newItem);
+                saveItems(items);
+                itemInput.value = '';
+            }
+        }
+
+        function editItem(index) {
+            const items = JSON.parse(localStorage.getItem('items')) || [];
+            const newValue = prompt('Edite o item:', items[index]);
+            if (newValue !== null) {
+                items[index] = newValue.trim();
+                saveItems(items);
+            }
+        }
+
+        function deleteItem(index) {
+            const items = JSON.parse(localStorage.getItem('items')) || [];
+            items.splice(index, 1);
+            saveItems(items);
+        }
+
+        addButton.addEventListener('click', addItem);
+        loadItems();
+    </script>
+</body>
+</html>
