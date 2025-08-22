@@ -9,5 +9,5 @@ Implementar suporte ao modo claro/escuro (dark mode) usando o sistema de temas d
 
 Regras de Estilo:
 Estilos como margin, padding, flex, text, bg, etc. devem ser convertidos para classes do Tailwind-RN.
-Componentes visuais como Button, Card, Dialog, TextField devem ser substituídos por equivalentes do Tamagui UI.
+Componentes visuais como Button, Card, Dialog, TextField devem ser substituídos por equivalentes do Tamagui UI, aplicando Medium Border Radius em com
 O modo noturno deve ser ativado com base no tema do sistema ou por controle manual, usando o sistema de temas do Tamagui (ThemeProvider, useTheme, etc.).
