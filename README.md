@@ -1,4 +1,4 @@
-Tenho um projeto React que utiliza Material UI e CSS puro. Quero migrar esse projeto para usar React Native Web, Tamagui UI para os componentes visuais e Tailwind-RN para os estilos.
+Este projeto utiliza Material UI e CSS puro, mas quero migrar esse projeto para usar React Native Web, Tamagui UI para os componentes visuais e Tailwind-RN para os estilos.
 
 Tarefas:
 Substituir todos os componentes do Material UI por equivalentes do Tamagui UI (Button, Input, Card, Sheet, etc.).
