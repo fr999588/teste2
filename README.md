@@ -9,6 +9,6 @@ Garantir que o layout continue responsivo e funcional em navegadores e dispositi
 Observações:
 
 O projeto pode usar bibliotecas como react-native-web, tailwind-rn, react-navigation, etc.
-Componentes como Button, Card, Dialog, TextField devem ser substituídos por equivalentes nativos ou customizados.
+Componentes como Button, Card, Dialog, TextField devem ser substituídos por equivalentes nativos.
 Estilos como margin, padding, flex, text, bg, etc., devem ser convertidos para classes do Tailwind-RN.
 Gere o código atualizado, mantendo a estrutura funcional e visual o mais próxima possível do original.
