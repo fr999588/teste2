@@ -15,7 +15,7 @@ O modo noturno deve ser ativado com base no tema do sistema ou por controle manu
 
 O algoritmo **SM-2** é um modelo de repetição espaçada criado por **Piotr Wozniak** para o software **SuperMemo**, e é a base do sistema de revisão usado pelo **Anki**. Ele foi projetado para otimizar o aprendizado ao revisar informações no momento ideal — nem cedo demais (o que desperdiça tempo), nem tarde demais (quando já se esqueceu).
 
-
+ ```text
 function updateCard(card, quality) {
   // quality: 0-5 (0 = totalmente errado, 5 = totalmente certo)
   if (quality < 3) {
@@ -55,7 +55,7 @@ let card = {
 
 card = updateCard(card, 4); // Qualidade da resposta: boa
 console.log(card);
-
+ ```
 
 
 
