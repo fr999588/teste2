@@ -6,6 +6,7 @@ Substituir todos os componentes do Material UI por equivalentes compatíveis com
 Remover todo o CSS puro e converter os estilos para Tailwind-RN, garantindo consistência visual entre plataformas.
 Adaptar a estrutura do projeto para funcionar com React Native Web, mantendo a lógica e funcionalidades existentes.
 Garantir que o layout continue responsivo e funcional em navegadores e dispositivos móveis.
+
 Observações:
 
 O projeto pode usar bibliotecas como react-native-web, tailwind-rn, react-navigation, etc.
