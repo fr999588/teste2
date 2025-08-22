@@ -1,15 +1,18 @@
-O projeto utiliza Material UI para componentes visuais e CSS puro para estilização, mas quero migrar esse projeto para usar React Native Web, mantendo compatibilidade com mobile e web.
+Tenho um projeto React que utiliza Material UI e CSS puro. Quero migrar esse projeto para usar React Native Web, Tamagui UI para os componentes visuais e Tailwind-RN para os estilos.
 
-As tarefas são:
-
-Substituir todos os componentes do Material UI por equivalentes compatíveis com React Native (como View, Text, TouchableOpacity, etc.).
-Remover todo o CSS puro e converter os estilos para Tailwind-RN, garantindo consistência visual entre plataformas.
+Tarefas:
+Substituir todos os componentes do Material UI por equivalentes do Tamagui UI (Button, Input, Card, Sheet, etc.).
+Remover todo o CSS puro e converter os estilos para Tailwind-RN, mantendo consistência visual entre plataformas.
 Adaptar a estrutura do projeto para funcionar com React Native Web, mantendo a lógica e funcionalidades existentes.
 Garantir que o layout continue responsivo e funcional em navegadores e dispositivos móveis.
 
-Observações:
+Tecnologias permitidas:
+react-native-web
+tamagui
+tailwind-rn
+react-navigation
+Outras libs compatíveis com React Native Web
 
-O projeto pode usar bibliotecas como react-native-web, tailwind-rn, react-navigation, etc.
-Componentes como Button, Card, Dialog, TextField devem ser substituídos por equivalentes nativos.
-Estilos como margin, padding, flex, text, bg, etc., devem ser convertidos para classes do Tailwind-RN.
-Gere o código atualizado, mantendo a estrutura funcional e visual o mais próxima possível do original.
+Regras de Estilo:
+Estilos como margin, padding, flex, text, bg, etc. devem ser convertidos para classes do Tailwind-RN.
+Componentes visuais como Button, Card, Dialog, TextField devem ser substituídos por equivalentes do Tamagui UI.
