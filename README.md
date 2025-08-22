@@ -12,7 +12,7 @@ Estilos como margin, padding, flex, text, bg, etc. devem ser convertidos para cl
 Componentes visuais como Button, Card, Dialog, TextField devem ser substituídos por equivalentes do Tamagui UI, aplicando Large Border Radius.
 O modo noturno deve ser ativado com base no tema do sistema ou por controle manual, usando o sistema de temas do Tamagui (ThemeProvider, useTheme, etc.).
 
-
+===========================================================================================
 O algoritmo **SM-2** é um modelo de repetição espaçada criado por **Piotr Wozniak** para o software **SuperMemo**, e é a base do sistema de revisão usado pelo **Anki**. Ele foi projetado para otimizar o aprendizado ao revisar informações no momento ideal — nem cedo demais (o que desperdiça tempo), nem tarde demais (quando já se esqueceu).
 
  ```text
