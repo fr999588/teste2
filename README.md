@@ -1,4 +1,4 @@
-Tenho um projeto React que utiliza Material UI para componentes visuais e CSS puro para estilização. Quero migrar esse projeto para usar React Native Web, mantendo compatibilidade com mobile e web.
+O projeto utiliza Material UI para componentes visuais e CSS puro para estilização, mas quero migrar esse projeto para usar React Native Web, mantendo compatibilidade com mobile e web.
 
 As tarefas são:
 
